@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Standard
+import sys
+from os.path import dirname, join
 from pathlib import Path
 
 # Third Party
-from sigstore.errors import VerificationError
 import click
 
 # First Party
@@ -16,16 +17,16 @@ from instructlab import signing, utils
 @click.option(
     "--model-path",
     type=click.Path(),
-    default=config.DEFAULT_MODEL_PATH,
+    default=dirname(config.DEFAULT_MODEL_PATH),
     show_default=True,
-    help="Path to the model to be signed.",
+    help="Path to the directory where the signed model is located.",
 )
 @click.option(
-    "--bundle-path",
+    "--signature",
     type=click.Path(),
     default=None,
-    show_default=True,
-    help="Path to save the Sigstore bundle file after signing.",
+    show_default=False,
+    help="Path to the signature. By default model.sig in the model path will be used.",
 )
 @click.option(
     "--identity",
@@ -40,26 +41,31 @@ from instructlab import signing, utils
     show_default=True,
 )
 @click.option(
-    "--staging",
+    "--yes",
     is_flag=True,
-    help="Use Sigstore's staging environment.",
+    show_default=True,
+    default=False,
+    help="Answer all interactive questions with 'yes'",
 )
-@click.pass_context
 @utils.display_params
-def verify(ctx, model_path, bundle_path, identity, issuer, staging):
+def verify(model_path, signature, identity, issuer, yes):
     """Signs a model with Sigstore"""
 
-    if bundle_path is None:
-        bundle_path = f"{model_path}.sigstore.json"
+    if signature is None:
+        signature = join(model_path, "model.sig")
 
     try:
+        if not identity or not issuer:
+            identity, issuer = signing.get_oidc_params_from_sigfile(Path(signature))
+            if not signing.confirm(f"Use identity '{identity}' and issuer '{issuer}' from {signature}? [y/N] ", yes):
+                sys.exit(1)
         signing.verify_model(
             model_path=Path(model_path),
-            bundle_path=Path(bundle_path),
+            signature_file=Path(signature),
             identity=identity,
             issuer=issuer,
-            staging=staging,
         )
-        print(f"✅ {bundle_path} passed verification")
-    except VerificationError as e:
-        print(f"❌ {bundle_path} failed verification: {str(e)}")
+        print(f"✅ {model_path} passed verification")
+    except Exception as e:
+        click.secho(f"❌ {model_path} failed verification: {e}", fg="red")
+        raise click.exceptions.Exit(1)

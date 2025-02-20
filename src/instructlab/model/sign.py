@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Standard
+from os.path import dirname, join
 from pathlib import Path
 
 # Third Party
@@ -15,30 +16,44 @@ from instructlab import signing, utils
 @click.option(
     "--model-path",
     type=click.Path(),
-    default=config.DEFAULT_MODEL_PATH,
+    default=dirname(config.DEFAULT_MODEL_PATH),
     show_default=True,
-    help="Path to the model to be signed.",
+    help="Path to the directory of the model to be signed.",
 )
 @click.option(
-    "--bundle-path",
+    "--sig_out",
     type=click.Path(),
     default=None,
-    show_default=True,
+    show_default=False,
     help="Path to save the Sigstore bundle file after signing.",
 )
 @click.option(
-    "--staging",
+    "--use-ambient-credentials",
     is_flag=True,
-    help="Use Sigstore's staging environment.",
+    show_default=True,
+    default=False,
+    help="use ambient credentials (also known as Workload Identity)",
 )
-@click.pass_context
+@click.option(
+    "--identity-token",
+    type=click.STRING,
+    default=None,
+    show_default=False,
+    help="Optional identity token",
+)
 @utils.display_params
-def sign(ctx, model_path, bundle_path, staging):
+def sign(model_path, sig_out, use_ambient_credentials, identity_token):
     """Signs a model with Sigstore"""
+    if sig_out is None:
+        sig_out = join(model_path, "model.sig")
 
-    if bundle_path is None:
-        bundle_path = f"{model_path}.sigstore.json"
-
-    signing.sign_model(
-        model_path=Path(model_path), bundle_path=Path(bundle_path), staging=staging
-    )
+    try:
+        signing.sign_model(
+            model_path=Path(model_path),
+            sig_out=Path(sig_out),
+            use_ambient_credentials=use_ambient_credentials,
+            identity_token=identity_token,
+        )
+    except Exception as e:
+        click.secho(f"Could not sign model in {model_path}: {e}", fg="red")
+        raise click.exceptions.Exit(1)

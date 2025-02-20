@@ -67,6 +67,8 @@ aliases = {
     "download": {"group": model_group.model, "cmd": model_group.download},
     "diff": {"group": taxonomy_group.taxonomy, "cmd": taxonomy_group.diff},
     "generate": {"group": data_group.data, "cmd": data_group.generate},
+    "sign": {"group": model_group.model, "cmd": model_group.sign},
+    "verify": {"group": model_group.model, "cmd": model_group.verify},
 }
 
 
